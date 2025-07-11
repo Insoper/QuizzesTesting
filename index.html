@@ -137,7 +137,7 @@
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
   <script>
     // Konfigurasi
-    const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbxogMZMaQp3khj9MhzYg97b7AKiPwj2d0f5cdFlk1Ktb6KyLsE1FQ_2zOuOHZoa0CfZWQ/exec';
+    const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbwxzFhOb7BrhrTzRNGZo4O6PTx0-_pezvwJ8PqCUX4sZXVBFmlXJp384q0IgxzaMtoDWQ/exec';
     
     // Variabel global
     let resultsData = [];
@@ -179,72 +179,77 @@
     // Fungsi untuk memuat kategori
     async function loadCategories() {
       try {
-        const response = await fetch(`${WEB_APP_URL}?action=getCategories`);
-        const data = await response.json();
-        
-        if (data.status === 'success' && data.data && data.data.length > 0) {
-          const select = document.getElementById('filter-category');
-          select.innerHTML = '<option value="all">Semua Kategori</option>';
-          
-          const uniqueCategories = [...new Set(data.data)];
-          uniqueCategories.forEach(category => {
-            if (category) {
-              const option = document.createElement('option');
-              option.value = category;
-              option.textContent = category;
-              select.appendChild(option);
-            }
-          });
-        }
-      } catch (error) {
-        console.error('Gagal memuat kategori:', error);
-      }
-    }
+        const response = await fetch(`${WEB_APP_URL}?action=getCategories`, {
+      mode: 'no-cors',
+      redirect: 'follow'
+    }).catch(error => {
+      throw new Error(`Gagal terhubung ke server: ${error.message}`);
+    });
     
-    // Fungsi untuk memuat hasil
-    async function loadResults() {
-      const category = document.getElementById('filter-category').value;
-      
-      const filterBtn = document.getElementById('filter-results');
-      const filterText = document.getElementById('filter-results-text');
-      const filterSpinner = document.getElementById('filter-results-spinner');
-      
-      filterBtn.disabled = true;
-      filterText.textContent = 'Memuat...';
-      filterSpinner.classList.remove('d-none');
-      
-      const tbody = document.querySelector('#class-summary-table tbody');
-      tbody.innerHTML = '<tr><td colspan="6" class="text-center"><span class="loading-spinner me-2"></span>Memuat data...</td></tr>';
-      
-      try {
-        let url = `${WEB_APP_URL}?action=getResults`;
-        if (category !== 'all') url += `&category=${encodeURIComponent(category)}`;
-        
-        const response = await fetch(url);
-        const data = await response.json();
-        
-        if (data.status === 'success') {
-          resultsData = data.data;
-          renderClassSummaryTable();
-        } else {
-          throw new Error(data.message || 'Gagal memuat hasil');
-        }
-      } catch (error) {
-        console.error('Error:', error);
-        const tbody = document.querySelector('#class-summary-table tbody');
-        tbody.innerHTML = `
-          <tr>
-            <td colspan="6" class="text-center text-danger">
-              Gagal memuat data. Silakan coba lagi.
-            </td>
-          </tr>
-        `;
-      } finally {
-        filterBtn.disabled = false;
-        filterText.textContent = 'Terapkan Filter';
-        filterSpinner.classList.add('d-none');
-      }
+    // Untuk mode 'no-cors' kita tidak bisa membaca response langsung
+    // Solusi alternatif dengan JSONP
+    await loadWithJSONP('getCategories');
+    
+  } catch (error) {
+    console.error('Gagal memuat kategori:', error);
+    alert('Gagal memuat data. Silakan coba lagi atau hubungi admin.');
+  }
+}
+
+    // Fungsi alternatif menggunakan JSONP untuk bypass CORS
+function loadWithJSONP(action, callback) {
+  return new Promise((resolve, reject) => {
+    const callbackName = `jsonp_callback_${Date.now()}`;
+    window[callbackName] = (data) => {
+      delete window[callbackName];
+      document.body.removeChild(script);
+      resolve(data);
+    };
+    
+    const script = document.createElement('script');
+    script.src = `${WEB_APP_URL}?action=${action}&callback=${callbackName}`;
+    script.onerror = () => {
+      reject(new Error('Gagal memuat data'));
+    };
+    document.body.appendChild(script);
+  });
+}
+    
+    // Fungsi untuk memuat hasil dengan error handling lebih baik
+async function loadResults() {
+  const category = document.getElementById('filter-category').value;
+  
+  try {
+    // Gunakan pendekatan JSONP
+    const data = await loadWithJSONP(`getResults&category=${encodeURIComponent(category)}`);
+    
+    if (data.status === 'success') {
+      resultsData = data.data;
+      renderClassSummaryTable();
+    } else {
+      throw new Error(data.message || 'Gagal memuat hasil');
     }
+  } catch (error) {
+    console.error('Error:', error);
+    const tbody = document.querySelector('#class-summary-table tbody');
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="6" class="text-center text-danger">
+          ${error.message || 'Gagal memuat data. Silakan coba lagi.'}
+        </td>
+      </tr>
+    `;
+  } finally {
+    // Reset loading state
+    const filterBtn = document.getElementById('filter-results');
+    const filterText = document.getElementById('filter-results-text');
+    const filterSpinner = document.getElementById('filter-results-spinner');
+    
+    filterBtn.disabled = false;
+    filterText.textContent = 'Terapkan Filter';
+    filterSpinner.classList.add('d-none');
+  }
+}
     
     // Fungsi untuk menampilkan ringkasan kelas
     function renderClassSummaryTable() {
