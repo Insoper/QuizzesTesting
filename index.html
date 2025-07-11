@@ -53,25 +53,8 @@
     .score-poor {
       background-color: #dc3545;
     }
-    .date-filter-container {
-      position: relative;
-    }
-    .date-filter-container .form-control {
-      padding-right: 2.5rem;
-    }
-    .date-filter-container .clear-date {
-      position: absolute;
-      right: 10px;
-      top: 50%;
-      transform: translateY(-50%);
-      cursor: pointer;
-      color: #6c757d;
-    }
     .sortable-header {
       cursor: pointer;
-    }
-    .sortable-header:hover {
-      background-color: #f8f9fa;
     }
   </style>
 </head>
@@ -89,12 +72,7 @@
               <option value="all">Semua Kategori</option>
             </select>
           </div>
-          <div class="col-md-4 date-filter-container">
-            <label for="filter-date" class="form-label">Filter Tanggal (DD/MM/YYYY)</label>
-            <input type="date" class="form-control" id="filter-date">
-            <span class="clear-date" id="clear-date-filter"><i class="fas fa-times"></i></span>
-          </div>
-          <div class="col-md-4 d-flex align-items-end">
+          <div class="col-md-8 d-flex align-items-end">
             <button class="btn btn-primary" id="filter-results">
               <span id="filter-results-text">Terapkan Filter</span>
               <span id="filter-results-spinner" class="loading-spinner d-none"></span>
@@ -174,12 +152,6 @@
       // Event listener untuk tombol filter
       document.getElementById('filter-results').addEventListener('click', loadResults);
       
-      // Event listener untuk tombol clear date
-      document.getElementById('clear-date-filter').addEventListener('click', function() {
-        document.getElementById('filter-date').value = '';
-        loadResults();
-      });
-      
       // Event listener untuk tombol kembali
       document.getElementById('back-to-summary').addEventListener('click', function() {
         document.getElementById('student-details-container').classList.add('d-none');
@@ -229,10 +201,9 @@
       }
     }
     
-    // Fungsi untuk memuat hasil dengan filter tanggal
+    // Fungsi untuk memuat hasil
     async function loadResults() {
       const category = document.getElementById('filter-category').value;
-      const dateFilter = document.getElementById('filter-date').value;
       
       const filterBtn = document.getElementById('filter-results');
       const filterText = document.getElementById('filter-results-text');
@@ -248,12 +219,6 @@
       try {
         let url = `${WEB_APP_URL}?action=getResults`;
         if (category !== 'all') url += `&category=${encodeURIComponent(category)}`;
-        if (dateFilter) {
-          // Format tanggal ke DD/MM/YYYY untuk filter
-          const [year, month, day] = dateFilter.split('-');
-          const formattedDate = `${day}/${month}/${year}`;
-          url += `&date=${formattedDate}`;
-        }
         
         const response = await fetch(url);
         const data = await response.json();
