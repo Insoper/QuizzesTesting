@@ -53,10 +53,6 @@
     .score-poor {
       background-color: #dc3545;
     }
-    .chart-container {
-      height: 300px;
-      margin-bottom: 20px;
-    }
     .date-filter-container {
       position: relative;
     }
@@ -70,6 +66,12 @@
       transform: translateY(-50%);
       cursor: pointer;
       color: #6c757d;
+    }
+    .sortable-header {
+      cursor: pointer;
+    }
+    .sortable-header:hover {
+      background-color: #f8f9fa;
     }
   </style>
 </head>
@@ -88,7 +90,7 @@
             </select>
           </div>
           <div class="col-md-4 date-filter-container">
-            <label for="filter-date" class="form-label">Filter Tanggal</label>
+            <label for="filter-date" class="form-label">Filter Tanggal (DD/MM/YYYY)</label>
             <input type="date" class="form-control" id="filter-date">
             <span class="clear-date" id="clear-date-filter"><i class="fas fa-times"></i></span>
           </div>
@@ -121,7 +123,7 @@
           </table>
         </div>
         
-        <!-- Tabel Detail Peserta dan Grafik -->
+        <!-- Tabel Detail Peserta -->
         <div class="d-none" id="student-details-container">
           <div class="row">
             <div class="col-md-8">
@@ -138,19 +140,12 @@
             </div>
           </div>
           
-          <div class="chart-container">
-            <canvas id="score-distribution-chart"></canvas>
-          </div>
-          
           <div class="table-responsive">
             <table class="table table-striped table-hover" id="student-details-table">
               <thead class="table-dark">
                 <tr>
-                  <th>No</th>
-                  <th>Nama Siswa</th>
-                  <th>Waktu Submit</th>
-                  <th>Nilai</th>
-                  <th>Status</th>
+                  <th class="sortable-header" data-sort="nama">Nama Siswa <i class="fas fa-sort"></i></th>
+                  <th class="sortable-header" data-sort="nilai">Nilai <i class="fas fa-sort"></i></th>
                 </tr>
               </thead>
               <tbody></tbody>
@@ -162,14 +157,14 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script>
     // Konfigurasi
     const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbxmYIGtbDeuJZBuYnzkmzzBnT7M0yoEc-tl2aHaCR677X0XChG24I8BC8YQjN2nyIW2oA/exec';
     
     // Variabel global
     let resultsData = [];
-    let scoreChart = null;
+    let currentSortField = 'nama';
+    let currentSortDirection = 'asc';
     
     // Inisialisasi saat DOM siap
     document.addEventListener('DOMContentLoaded', function() {
@@ -189,10 +184,23 @@
       document.getElementById('back-to-summary').addEventListener('click', function() {
         document.getElementById('student-details-container').classList.add('d-none');
         document.querySelector('#class-summary-table').closest('.table-responsive').classList.remove('d-none');
-        if (scoreChart) {
-          scoreChart.destroy();
-          scoreChart = null;
-        }
+      });
+      
+      // Event listener untuk sorting
+      document.querySelectorAll('.sortable-header').forEach(header => {
+        header.addEventListener('click', function() {
+          const sortField = this.getAttribute('data-sort');
+          if (currentSortField === sortField) {
+            currentSortDirection = currentSortDirection === 'asc' ? 'desc' : 'asc';
+          } else {
+            currentSortField = sortField;
+            currentSortDirection = 'asc';
+          }
+          const classCode = document.getElementById('detail-class-code').textContent;
+          if (classCode) {
+            showStudentDetails(classCode);
+          }
+        });
       });
     });
     
@@ -241,8 +249,9 @@
         let url = `${WEB_APP_URL}?action=getResults`;
         if (category !== 'all') url += `&category=${encodeURIComponent(category)}`;
         if (dateFilter) {
-          // Format tanggal ke YYYY-MM-DD untuk filter
-          const formattedDate = new Date(dateFilter).toISOString().split('T')[0];
+          // Format tanggal ke DD/MM/YYYY untuk filter
+          const [year, month, day] = dateFilter.split('-');
+          const formattedDate = `${day}/${month}/${year}`;
           url += `&date=${formattedDate}`;
         }
         
@@ -288,7 +297,7 @@
           acc[result.KodeKelas] = {
             KodeKelas: result.KodeKelas,
             Kategori: result.Kategori,
-            Tanggal: result.Timestamp ? new Date(result.Timestamp).toLocaleDateString('id-ID') : '-',
+            Tanggal: result.Timestamp ? formatDateDisplay(new Date(result.Timestamp)) : '-',
             Peserta: [],
             TotalSkor: 0
           };
@@ -335,28 +344,52 @@
       
       document.getElementById('detail-class-code').textContent = classCode;
       document.getElementById('detail-class-date').textContent = firstRecord.Timestamp 
-        ? formatDate(new Date(firstRecord.Timestamp)) 
+        ? formatDateDisplay(new Date(firstRecord.Timestamp)) 
         : '';
       
       const tbody = document.querySelector('#student-details-table tbody');
       tbody.innerHTML = '';
       
-      // Urutkan berdasarkan nilai tertinggi
-      classData.sort((a, b) => (b.Skor || 0) - (a.Skor || 0));
+      // Urutkan data berdasarkan field yang dipilih
+      const sortedData = [...classData].sort((a, b) => {
+        let valueA, valueB;
+        
+        if (currentSortField === 'nama') {
+          valueA = a.NamaSiswa || '';
+          valueB = b.NamaSiswa || '';
+          return currentSortDirection === 'asc' 
+            ? valueA.localeCompare(valueB) 
+            : valueB.localeCompare(valueA);
+        } else {
+          valueA = parseInt(a.Skor) || 0;
+          valueB = parseInt(b.Skor) || 0;
+          return currentSortDirection === 'asc' 
+            ? valueA - valueB 
+            : valueB - valueA;
+        }
+      });
       
-      // Tampilkan semua data siswa
-      classData.forEach((result, index) => {
+      // Update icon sort
+      document.querySelectorAll('.sortable-header i').forEach(icon => {
+        icon.className = 'fas fa-sort';
+      });
+      
+      const activeSortIcon = document.querySelector(`.sortable-header[data-sort="${currentSortField}"] i`);
+      if (activeSortIcon) {
+        activeSortIcon.className = currentSortDirection === 'asc' 
+          ? 'fas fa-sort-up' 
+          : 'fas fa-sort-down';
+      }
+      
+      // Tampilkan data siswa yang sudah diurutkan
+      sortedData.forEach((result) => {
         const row = document.createElement('tr');
-        const timestamp = result.Timestamp ? new Date(result.Timestamp) : null;
         const score = result.Skor || 0;
         const scoreClass = getScoreClass(score);
         
         row.innerHTML = `
-          <td>${index + 1}</td>
           <td>${result.NamaSiswa || '-'}</td>
-          <td>${timestamp ? formatTime(timestamp) : '-'}</td>
-          <td>${score}</td>
-          <td><span class="badge badge-score ${scoreClass}">${getScoreStatus(score)}</span></td>
+          <td><span class="badge badge-score ${scoreClass}">${score}</span></td>
         `;
         
         tbody.appendChild(row);
@@ -365,81 +398,6 @@
       // Tampilkan detail dan sembunyikan ringkasan
       document.querySelector('#class-summary-table').closest('.table-responsive').classList.add('d-none');
       document.getElementById('student-details-container').classList.remove('d-none');
-      
-      // Buat/tampilkan grafik distribusi nilai
-      renderScoreChart(classData);
-    }
-    
-    // Fungsi untuk membuat grafik distribusi nilai
-    function renderScoreChart(classData) {
-      const ctx = document.getElementById('score-distribution-chart').getContext('2d');
-      
-      // Hitung distribusi nilai
-      const scoreRanges = [
-        { min: 0, max: 49, label: '0-49' },
-        { min: 50, max: 64, label: '50-64' },
-        { min: 65, max: 79, label: '65-79' },
-        { min: 80, max: 89, label: '80-89' },
-        { min: 90, max: 100, label: '90-100' }
-      ];
-      
-      const distribution = scoreRanges.map(range => {
-        return classData.filter(student => {
-          const score = parseInt(student.Skor) || 0;
-          return score >= range.min && score <= range.max;
-        }).length;
-      });
-      
-      const labels = scoreRanges.map(range => range.label);
-      
-      // Hancurkan chart sebelumnya jika ada
-      if (scoreChart) {
-        scoreChart.destroy();
-      }
-      
-      scoreChart = new Chart(ctx, {
-        type: 'bar',
-        data: {
-          labels: labels,
-          datasets: [{
-            label: 'Distribusi Nilai',
-            data: distribution,
-            backgroundColor: [
-              'rgba(220, 53, 69, 0.7)',
-              'rgba(255, 193, 7, 0.7)',
-              'rgba(23, 162, 184, 0.7)',
-              'rgba(108, 117, 125, 0.7)',
-              'rgba(40, 167, 69, 0.7)'
-            ],
-            borderColor: [
-              'rgba(220, 53, 69, 1)',
-              'rgba(255, 193, 7, 1)',
-              'rgba(23, 162, 184, 1)',
-              'rgba(108, 117, 125, 1)',
-              'rgba(40, 167, 69, 1)'
-            ],
-            borderWidth: 1
-          }]
-        },
-        options: {
-          responsive: true,
-          scales: {
-            y: {
-              beginAtZero: true,
-              title: {
-                display: true,
-                text: 'Jumlah Siswa'
-              }
-            },
-            x: {
-              title: {
-                display: true,
-                text: 'Rentang Nilai'
-              }
-            }
-          }
-        }
-      });
     }
     
     // Fungsi helper untuk menentukan kelas CSS berdasarkan nilai
@@ -451,26 +409,13 @@
       return 'score-poor';
     }
     
-    // Fungsi helper untuk menentukan status nilai
-    function getScoreStatus(score) {
-      score = parseInt(score) || 0;
-      if (score >= 90) return 'Sangat Baik';
-      if (score >= 80) return 'Baik';
-      if (score >= 65) return 'Cukup';
-      return 'Perlu Perbaikan';
-    }
-    
-    // Fungsi format tanggal Indonesia (hari, tanggal bulan tahun)
-    function formatDate(date) {
+    // Fungsi format tampilan tanggal (DD/MM/YYYY)
+    function formatDateDisplay(date) {
       if (!date) return '-';
-      const options = { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' };
-      return date.toLocaleDateString('id-ID', options);
-    }
-    
-    // Fungsi format waktu (HH:MM)
-    function formatTime(date) {
-      if (!date) return '-';
-      return date.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+      const day = date.getDate().toString().padStart(2, '0');
+      const month = (date.getMonth() + 1).toString().padStart(2, '0');
+      const year = date.getFullYear();
+      return `${day}/${month}/${year}`;
     }
   </script>
 </body>
