@@ -3,389 +3,109 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Hasil Quiz Interaktif</title>
+  <title>Hasil Quiz</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <style>
-    .table-responsive {
-      margin-bottom: 20px;
-    }
-    .view-details-btn {
-      transition: all 0.2s;
-    }
-    .view-details-btn:hover {
-      transform: translateY(-1px);
-      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-    }
-    #student-details-container {
-      transition: opacity 0.3s ease;
-    }
-    .loading-spinner {
-      display: inline-block;
-      width: 1rem;
-      height: 1rem;
-      vertical-align: text-bottom;
-      border: 0.25em solid currentColor;
-      border-right-color: transparent;
-      border-radius: 50%;
-      animation: spinner-border .75s linear infinite;
-    }
-    @keyframes spinner-border {
-      to { transform: rotate(360deg); }
-    }
-    .d-none {
-      display: none;
-    }
-    .badge-score {
+    .badge {
       font-size: 0.9em;
-      padding: 0.35em 0.65em;
     }
-    .score-excellent {
-      background-color: #28a745;
-    }
-    .score-good {
-      background-color: #17a2b8;
-    }
-    .score-average {
-      background-color: #ffc107;
-      color: #212529;
-    }
-    .score-poor {
-      background-color: #dc3545;
-    }
-    .sortable-header {
-      cursor: pointer;
-    }
+    .bg-excellent { background-color: #28a745; }
+    .bg-good { background-color: #17a2b8; }
+    .bg-average { background-color: #ffc107; color: #000; }
+    .bg-poor { background-color: #dc3545; }
   </style>
 </head>
 <body>
   <div class="container mt-4">
     <div class="card">
       <div class="card-header bg-primary text-white">
-        <h5 class="mb-0">Hasil Quiz Interaktif</h5>
+        <h5>Hasil Quiz Interaktif</h5>
       </div>
       <div class="card-body">
         <div class="row mb-3">
           <div class="col-md-4">
-            <label for="filter-category" class="form-label">Filter Kategori</label>
-            <select class="form-select" id="filter-category">
+            <select class="form-select" id="categoryFilter">
               <option value="all">Semua Kategori</option>
             </select>
           </div>
-          <div class="col-md-8 d-flex align-items-end">
-            <button class="btn btn-primary" id="filter-results">
-              <span id="filter-results-text">Terapkan Filter</span>
-              <span id="filter-results-spinner" class="loading-spinner d-none"></span>
-            </button>
+          <div class="col-md-2">
+            <button class="btn btn-primary w-100" id="filterBtn">Filter</button>
           </div>
         </div>
         
-        <!-- Tabel Ringkasan Kelas -->
         <div class="table-responsive">
-          <table class="table table-striped table-hover" id="class-summary-table">
-            <thead class="table-dark">
+          <table class="table table-striped">
+            <thead>
               <tr>
-                <th>Kode Kelas</th>
+                <th>Nama Siswa</th>
+                <th>Kelas</th>
                 <th>Kategori</th>
-                <th>Tanggal</th>
-                <th>Jumlah Peserta</th>
-                <th>Rata-rata Nilai</th>
-                <th>Aksi</th>
+                <th>Nilai</th>
               </tr>
             </thead>
-            <tbody>
-              <tr>
-                <td colspan="6" class="text-center">Gunakan filter untuk melihat hasil</td>
-              </tr>
+            <tbody id="resultsBody">
+              <tr><td colspan="4" class="text-center">Pilih filter untuk melihat hasil</td></tr>
             </tbody>
           </table>
-        </div>
-        
-        <!-- Tabel Detail Peserta -->
-        <div class="d-none" id="student-details-container">
-          <div class="row">
-            <div class="col-md-8">
-              <h5 class="mb-3">
-                Detail Peserta Kelas: 
-                <span id="detail-class-code" class="badge bg-primary"></span>
-                <small class="text-muted ms-2" id="detail-class-date"></small>
-              </h5>
-            </div>
-            <div class="col-md-4 text-end">
-              <button class="btn btn-secondary" id="back-to-summary">
-                <i class="fas fa-arrow-left me-2"></i>Kembali ke Ringkasan
-              </button>
-            </div>
-          </div>
-          
-          <div class="table-responsive">
-            <table class="table table-striped table-hover" id="student-details-table">
-              <thead class="table-dark">
-                <tr>
-                  <th class="sortable-header" data-sort="nama">Nama Siswa <i class="fas fa-sort"></i></th>
-                  <th class="sortable-header" data-sort="nilai">Nilai <i class="fas fa-sort"></i></th>
-                </tr>
-              </thead>
-              <tbody></tbody>
-            </table>
-          </div>
         </div>
       </div>
     </div>
   </div>
 
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
   <script>
-    // Konfigurasi
-    const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbwMwVkyVZYbVxwWJ9YOyWMcqsX4-EeQfONHs9wLjivFOa53mc86AbPY5hIAKDdu6NmdMA/exec';
-    
-    // Variabel global
-    let resultsData = [];
-    let currentSortField = 'nama';
-    let currentSortDirection = 'asc';
-    
-    // Inisialisasi saat DOM siap
-    document.addEventListener('DOMContentLoaded', function() {
-      // Load kategori saat pertama kali
-      loadCategories();
-      
-      // Event listener untuk tombol filter
-      document.getElementById('filter-results').addEventListener('click', loadResults);
-      
-      // Event listener untuk tombol kembali
-      document.getElementById('back-to-summary').addEventListener('click', function() {
-        document.getElementById('student-details-container').classList.add('d-none');
-        document.querySelector('#class-summary-table').closest('.table-responsive').classList.remove('d-none');
-      });
-      
-      // Event listener untuk sorting
-      document.querySelectorAll('.sortable-header').forEach(header => {
-        header.addEventListener('click', function() {
-          const sortField = this.getAttribute('data-sort');
-          if (currentSortField === sortField) {
-            currentSortDirection = currentSortDirection === 'asc' ? 'desc' : 'asc';
-          } else {
-            currentSortField = sortField;
-            currentSortDirection = 'asc';
-          }
-          const classCode = document.getElementById('detail-class-code').textContent;
-          if (classCode) {
-            showStudentDetails(classCode);
-          }
-        });
-      });
+    const SCRIPT_URL = 'YOUR_DEPLOYED_SCRIPT_URL';
+
+    document.addEventListener('DOMContentLoaded', async () => {
+      await loadCategories();
+      document.getElementById('filterBtn').addEventListener('click', loadResults);
     });
-    
-    // Fungsi untuk memuat kategori
+
     async function loadCategories() {
       try {
-        const response = await fetch(`${WEB_APP_URL}?action=getCategories`, {
-      mode: 'no-cors',
-      redirect: 'follow'
-    }).catch(error => {
-      throw new Error(`Gagal terhubung ke server: ${error.message}`);
-    });
-    
-    // Untuk mode 'no-cors' kita tidak bisa membaca response langsung
-    // Solusi alternatif dengan JSONP
-    await loadWithJSONP('getCategories');
-    
-  } catch (error) {
-    console.error('Gagal memuat kategori:', error);
-    alert('Gagal memuat data. Silakan coba lagi atau hubungi admin.');
-  }
-}
-
-    // Fungsi alternatif menggunakan JSONP untuk bypass CORS
-function loadWithJSONP(action, callback) {
-  return new Promise((resolve, reject) => {
-    const callbackName = `jsonp_callback_${Date.now()}`;
-    window[callbackName] = (data) => {
-      delete window[callbackName];
-      document.body.removeChild(script);
-      resolve(data);
-    };
-    
-    const script = document.createElement('script');
-    script.src = `${WEB_APP_URL}?action=${action}&callback=${callbackName}`;
-    script.onerror = () => {
-      reject(new Error('Gagal memuat data'));
-    };
-    document.body.appendChild(script);
-  });
-}
-    
-    // Fungsi untuk memuat hasil dengan error handling lebih baik
-async function loadResults() {
-  const category = document.getElementById('filter-category').value;
-  
-  try {
-    // Gunakan pendekatan JSONP
-    const data = await loadWithJSONP(`getResults&category=${encodeURIComponent(category)}`);
-    
-    if (data.status === 'success') {
-      resultsData = data.data;
-      renderClassSummaryTable();
-    } else {
-      throw new Error(data.message || 'Gagal memuat hasil');
-    }
-  } catch (error) {
-    console.error('Error:', error);
-    const tbody = document.querySelector('#class-summary-table tbody');
-    tbody.innerHTML = `
-      <tr>
-        <td colspan="6" class="text-center text-danger">
-          ${error.message || 'Gagal memuat data. Silakan coba lagi.'}
-        </td>
-      </tr>
-    `;
-  } finally {
-    // Reset loading state
-    const filterBtn = document.getElementById('filter-results');
-    const filterText = document.getElementById('filter-results-text');
-    const filterSpinner = document.getElementById('filter-results-spinner');
-    
-    filterBtn.disabled = false;
-    filterText.textContent = 'Terapkan Filter';
-    filterSpinner.classList.add('d-none');
-  }
-}
-    
-    // Fungsi untuk menampilkan ringkasan kelas
-    function renderClassSummaryTable() {
-      const tbody = document.querySelector('#class-summary-table tbody');
-      tbody.innerHTML = '';
-      
-      if (!resultsData || resultsData.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="6" class="text-center">Tidak ada data yang sesuai</td></tr>';
-        return;
-      }
-      
-      // Kelompokkan data berdasarkan kode kelas
-      const classGroups = resultsData.reduce((acc, result) => {
-        if (!acc[result.KodeKelas]) {
-          acc[result.KodeKelas] = {
-            KodeKelas: result.KodeKelas,
-            Kategori: result.Kategori,
-            Tanggal: result.Timestamp ? formatDateDisplay(new Date(result.Timestamp)) : '-',
-            Peserta: [],
-            TotalSkor: 0
-          };
-        }
-        acc[result.KodeKelas].Peserta.push(result);
-        acc[result.KodeKelas].TotalSkor += parseInt(result.Skor) || 0;
-        return acc;
-      }, {});
-      
-      // Tampilkan ringkasan per kelas
-      Object.values(classGroups).forEach(classData => {
-        const row = document.createElement('tr');
-        const avgScore = (classData.TotalSkor / classData.Peserta.length).toFixed(2);
+        const res = await fetch(`${SCRIPT_URL}?action=getCategories`);
+        const { data } = await res.json();
+        const select = document.getElementById('categoryFilter');
         
-        row.innerHTML = `
-          <td>${classData.KodeKelas || '-'}</td>
-          <td>${classData.Kategori || '-'}</td>
-          <td>${classData.Tanggal}</td>
-          <td>${classData.Peserta.length}</td>
-          <td>${avgScore}</td>
-          <td>
-            <button class="btn btn-sm btn-primary view-details-btn" data-class="${classData.KodeKelas}">
-              <i class="fas fa-users me-1"></i> Lihat Detail
-            </button>
-          </td>
-        `;
-        
-        tbody.appendChild(row);
-      });
-      
-      // Tambahkan event listener untuk tombol detail
-      document.querySelectorAll('.view-details-btn').forEach(btn => {
-        btn.addEventListener('click', function() {
-          const classCode = this.getAttribute('data-class');
-          showStudentDetails(classCode);
+        data.forEach(cat => {
+          select.innerHTML += `<option value="${cat}">${cat}</option>`;
         });
-      });
-    }
-    
-    // Fungsi untuk menampilkan detail peserta kelas
-    function showStudentDetails(classCode) {
-      const classData = resultsData.filter(result => result.KodeKelas === classCode);
-      const firstRecord = classData[0] || {};
-      
-      document.getElementById('detail-class-code').textContent = classCode;
-      document.getElementById('detail-class-date').textContent = firstRecord.Timestamp 
-        ? formatDateDisplay(new Date(firstRecord.Timestamp)) 
-        : '';
-      
-      const tbody = document.querySelector('#student-details-table tbody');
-      tbody.innerHTML = '';
-      
-      // Urutkan data berdasarkan field yang dipilih
-      const sortedData = [...classData].sort((a, b) => {
-        let valueA, valueB;
-        
-        if (currentSortField === 'nama') {
-          valueA = a.NamaSiswa || '';
-          valueB = b.NamaSiswa || '';
-          return currentSortDirection === 'asc' 
-            ? valueA.localeCompare(valueB) 
-            : valueB.localeCompare(valueA);
-        } else {
-          valueA = parseInt(a.Skor) || 0;
-          valueB = parseInt(b.Skor) || 0;
-          return currentSortDirection === 'asc' 
-            ? valueA - valueB 
-            : valueB - valueA;
-        }
-      });
-      
-      // Update icon sort
-      document.querySelectorAll('.sortable-header i').forEach(icon => {
-        icon.className = 'fas fa-sort';
-      });
-      
-      const activeSortIcon = document.querySelector(`.sortable-header[data-sort="${currentSortField}"] i`);
-      if (activeSortIcon) {
-        activeSortIcon.className = currentSortDirection === 'asc' 
-          ? 'fas fa-sort-up' 
-          : 'fas fa-sort-down';
+      } catch (error) {
+        console.error("Gagal memuat kategori:", error);
       }
-      
-      // Tampilkan data siswa yang sudah diurutkan
-      sortedData.forEach((result) => {
-        const row = document.createElement('tr');
-        const score = result.Skor || 0;
-        const scoreClass = getScoreClass(score);
-        
-        row.innerHTML = `
-          <td>${result.NamaSiswa || '-'}</td>
-          <td><span class="badge badge-score ${scoreClass}">${score}</span></td>
-        `;
-        
-        tbody.appendChild(row);
-      });
-      
-      // Tampilkan detail dan sembunyikan ringkasan
-      document.querySelector('#class-summary-table').closest('.table-responsive').classList.add('d-none');
-      document.getElementById('student-details-container').classList.remove('d-none');
     }
-    
-    // Fungsi helper untuk menentukan kelas CSS berdasarkan nilai
+
+    async function loadResults() {
+      const category = document.getElementById('categoryFilter').value;
+      const url = `${SCRIPT_URL}?action=getResults${category !== 'all' ? `&category=${category}` : ''}`;
+      
+      try {
+        const res = await fetch(url);
+        const { data } = await res.json();
+        const tbody = document.getElementById('resultsBody');
+        tbody.innerHTML = '';
+        
+        data.forEach(item => {
+          const scoreClass = getScoreClass(item.Skor);
+          tbody.innerHTML += `
+            <tr>
+              <td>${item.NamaSiswa || '-'}</td>
+              <td>${item.KodeKelas || '-'}</td>
+              <td>${item.Kategori || '-'}</td>
+              <td><span class="badge ${scoreClass}">${item.Skor || '0'}</span></td>
+            </tr>
+          `;
+        });
+      } catch (error) {
+        console.error("Gagal memuat hasil:", error);
+      }
+    }
+
     function getScoreClass(score) {
       score = parseInt(score) || 0;
-      if (score >= 90) return 'score-excellent';
-      if (score >= 80) return 'score-good';
-      if (score >= 65) return 'score-average';
-      return 'score-poor';
-    }
-    
-    // Fungsi format tampilan tanggal (DD/MM/YYYY)
-    function formatDateDisplay(date) {
-      if (!date) return '-';
-      const day = date.getDate().toString().padStart(2, '0');
-      const month = (date.getMonth() + 1).toString().padStart(2, '0');
-      const year = date.getFullYear();
-      return `${day}/${month}/${year}`;
+      if (score >= 90) return 'bg-excellent';
+      if (score >= 80) return 'bg-good';
+      if (score >= 65) return 'bg-average';
+      return 'bg-poor';
     }
   </script>
 </body>
