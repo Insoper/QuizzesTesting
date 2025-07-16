@@ -1,6 +1,6 @@
 const CACHE_NAME = 'kuis-interaktif-v3';
 const OFFLINE_URL = 'offline.html';
-const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbwKYg9QAx77nM9Pl5iWqHw0_NFkb9l8GWhtXhW2ln-FWp48B1uCMO5IpL49in4SQCPW7Q/exec';
+const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbylZavzpoOlj8-j4zf0Mmp_JloMLRGhqptIvV5x_uNvMdzGnpc3B3eIzOEbdmF6aWMSgg/exec';
 
 const urlsToCache = [
   './',
